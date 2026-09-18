@@ -22,22 +22,24 @@ Python 3.10+ is recommended.
 ```bash
 python -m venv .venv
 # macOS/Linux: source .venv/bin/activate
-# Windows: .venv\\Scripts\\activate
+# Windows: .venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-## Input
+## Sample input
 
-Provide a FASTA file containing two or more bacterial 16S rRNA sequences. FASTA identifiers become the row/column labels in the matrix and the tip labels in the tree.
+A sample FASTA is included in `data/16s_sequences.fasta` so the pipeline can run immediately.
 
 ```fasta
 >Escherichia_coli
-ACGT...
-> Bacillus_subtilis
-ACGT...
+ATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCAT
+>Salmonella_enterica
+ATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCAT
+>Bacillus_subtilis
+ATCGATCGATCGATCCGATCGGCGCGCATATCGATCGATCGATCGGCGCGCAT
+>Pseudomonas_aeruginosa
+ATCGATCGATCGATCGATCGGCGCGCAGATCGATCGATCGATCGATCGGCGCGCAT
 ```
-
-Use real, curated 16S sequences from a trusted source such as NCBI. The pipeline does not silently download records, so analyses remain reproducible and network-independent.
 
 ## Run the analysis
 
@@ -49,7 +51,7 @@ This creates:
 
 - `results/sequence_metrics.csv` — sequence length and GC content
 - `results/sequence_identity_matrix.csv` — all-vs-all identity percentages
-- `results/neighbor_joining_tree.nwk` — Neighbor-Joining tree in Newick format
+- `results/neighbor_joining_tree.nwk` — a Neighbor-Joining tree in Newick format
 
 Generate the visualizations:
 
@@ -59,14 +61,14 @@ python visualize_results.py --results-dir results
 
 This creates:
 
-- `results/gc_comparison.png` — GC-content comparison
-- `results/identity_heatmap.png` — annotated identity heatmap
+- `results/gc_comparison.png` — GC-content comparison chart
+- `results/identity_heatmap.png` — pairwise identity heatmap
 
 The Newick tree can be opened in FigTree, iTOL, or rendered with Biopython.
 
 ## Method notes
 
-Identity is calculated from a global alignment as matching alignment columns divided by total alignment columns, including gaps. Distances for the Neighbor-Joining tree are `1 - identity`, represented as a fraction. This is a simple exploratory phylogenetic workflow, not a substitute for curated multiple-sequence alignment, model selection, or bootstrap support.
+Identity is calculated from a global alignment as matching alignment columns divided by total alignment columns, including gaps. Distances for the Neighbor-Joining tree are `1 - identity` represented as a fraction. This is a simple exploratory phylogenetic workflow, not a substitute for curated multiple-sequence alignment, model selection, or bootstrap support.
 
 ## Repository layout
 
@@ -76,8 +78,11 @@ Identity is calculated from a global alignment as matching alignment columns div
 ├── visualize_results.py  # GC-content and identity heatmap plots
 ├── requirements.txt
 ├── accession_metadate.csv
-├── results/              # Generated outputs (not required as source input)
-└── README.md
+├── data/
+│   └── 16s_sequences.fasta
+├── results/              # Generated outputs
+├── README.md
+└── genomic_analysis_chart.png
 ```
 
 ## Reproducibility and quality checks

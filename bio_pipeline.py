@@ -1,12 +1,12 @@
 import argparse
 import csv
 from pathlib import Path
-from typing import Dict, Mapping, Sequence
+from typing import Dict, Mapping
 
 import matplotlib.pyplot as plt
 from Bio import Phylo, SeqIO
 from Bio.Align import PairwiseAligner
-from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceMatrix, DistanceTreeConstructor
+from Bio.Phylo.TreeConstruction import DistanceMatrix, DistanceTreeConstructor
 
 
 def _normalise_sequence(sequence: str) -> str:
@@ -91,10 +91,11 @@ def write_identity_matrix(matrix: Mapping[str, Mapping[str, float]], output_path
 def build_neighbor_joining_tree(matrix: Mapping[str, Mapping[str, float]]):
     """Build a Neighbor-Joining tree from percentage identities."""
     names = list(matrix)
-    distances = [[0.0 if i == j else (100.0 - matrix[names[i]][names[j]]) / 100.0
-                  for j in range(i + 1)] for i in range(len(names))]
-    distance_matrix = DistanceMatrix(names, distances)
-    return DistanceTreeConstructor().nj(distance_matrix)
+    distance_matrix = [
+        [0.0 if i == j else 1.0 - (matrix[names[i]][names[j]] / 100.0) for j in range(len(names))]
+        for i in range(len(names))
+    ]
+    return DistanceTreeConstructor().nj(DistanceMatrix(names, distance_matrix))
 
 
 def write_neighbor_joining_tree(matrix: Mapping[str, Mapping[str, float]], output_path: str | Path) -> None:
@@ -107,7 +108,10 @@ def analyze_sequence(seq: str) -> dict:
     counts = {base: seq.count(base) for base in "ATGC"}
     return {
         "length": len(seq),
-        "A": counts["A"], "T": counts["T"], "G": counts["G"], "C": counts["C"],
+        "A": counts["A"],
+        "T": counts["T"],
+        "G": counts["G"],
+        "C": counts["C"],
         "GC_content": (counts["G"] + counts["C"]) / len(seq) * 100,
     }
 
@@ -130,8 +134,11 @@ def analyze_fasta(fasta_path: str | Path, output_dir: str | Path = "results") ->
         writer.writeheader()
         for name, sequence in sequences.items():
             metrics = analyze_sequence(sequence)
-            writer.writerow({"organism": name, "length": metrics["length"],
-                             "gc_percentage": f"{metrics['GC_content']:.6f}"})
+            writer.writerow({
+                "organism": name,
+                "length": metrics["length"],
+                "gc_percentage": f"{metrics['GC_content']:.6f}",
+            })
     return matrix
 
 

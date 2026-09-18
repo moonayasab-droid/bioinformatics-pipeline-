@@ -13,12 +13,21 @@ def plot_gc_content(metrics_path: str | Path, output_path: str | Path) -> None:
         raise ValueError(f"Missing columns in metrics file: {', '.join(sorted(missing))}")
     fig, ax = plt.subplots(figsize=(11, 6))
     bars = ax.bar(df["organism"], df["gc_percentage"], color="#4C72B0")
-    ax.set(xlabel="Bacterial sequence", ylabel="GC content (%)", ylim=(0, 100),
-           title="GC Content of 16S rRNA Sequences")
+    ax.set(
+        xlabel="Bacterial sequence",
+        ylabel="GC content (%)",
+        ylim=(0, 100),
+        title="GC Content of 16S rRNA Sequences",
+    )
     ax.tick_params(axis="x", rotation=35)
     for bar in bars:
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                f"{bar.get_height():.1f}%", ha="center", fontsize=9)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1,
+            f"{bar.get_height():.1f}%",
+            ha="center",
+            fontsize=9,
+        )
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
@@ -39,7 +48,15 @@ def plot_identity_heatmap(matrix_path: str | Path, output_path: str | Path) -> N
     if len(matrix) <= 20:
         for row in range(len(matrix.index)):
             for col in range(len(matrix.columns)):
-                ax.text(col, row, f"{matrix.iloc[row, col]:.1f}", ha="center", va="center", color="white", fontsize=8)
+                ax.text(
+                    col,
+                    row,
+                    f"{matrix.iloc[row, col]:.1f}",
+                    ha="center",
+                    va="center",
+                    color="white",
+                    fontsize=8,
+                )
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
