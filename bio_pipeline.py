@@ -1,13 +1,9 @@
-import urllib.request
-import json
-from typing import Tuple
-
 import matplotlib.pyplot as plt
 from Bio.Align import PairwiseAligner
 
 
 def _normalise_sequence(sequence: str) -> str:
-    """Return a sequence in a form suitable for alignment."""
+    """Return a clean uppercase sequence with whitespace removed."""
     if not isinstance(sequence, str):
         raise TypeError("Sequences must be strings.")
 
@@ -18,48 +14,56 @@ def _normalise_sequence(sequence: str) -> str:
 
 
 def pairwise_sequence_identity(sequence_a: str, sequence_b: str) -> float:
-    """Calculate percentage identity for a global pairwise alignment.
-
-    Identity is the number of matching aligned residues divided by the total
-    number of alignment columns, including columns containing a gap.  Input
-    whitespace is ignored and sequences are compared case-insensitively.
-
-    Args:
-        sequence_a: The first nucleotide or amino-acid sequence.
-        sequence_b: The second nucleotide or amino-acid sequence.
-
-    Returns:
-        Percentage identity in the range 0.0 to 100.0.
-    """
+    """Return the percentage identity between two sequences using a global alignment."""
     sequence_a = _normalise_sequence(sequence_a)
     sequence_b = _normalise_sequence(sequence_b)
 
     aligner = PairwiseAligner()
     aligner.mode = "global"
+    aligner.match_score = 1
+    aligner.mismatch_score = 0
+    aligner.open_gap_score = -1
+    aligner.extend_gap_score = -1
+
     alignment = aligner.align(sequence_a, sequence_b)[0]
+    aligned_a = str(alignment[0])
+    aligned_b = str(alignment[1])
 
-    # PairwiseAligner exposes the alignment as coordinate blocks.  Walking
-    # those blocks lets us count matches without relying on formatted output.
-    coordinates = alignment.coordinates
-    matches = 0
-    alignment_length = 0
+    if len(aligned_a) == 0:
+        return 0.0
 
-    for index in range(coordinates.shape[1] - 1):
-        start_a, start_b = coordinates[:, index]
-        end_a, end_b = coordinates[:, index + 1]
-        consumed_a = end_a - start_a
-        consumed_b = end_b - start_b
+    matches = sum(res_a == res_b for res_a, res_b in zip(aligned_a, aligned_b))
+    identity_percent = (matches / len(aligned_a)) * 100
+    return identity_percent
 
-        if consumed_a and consumed_b:
-            matches += sum(
-                residue_a == residue_b
-                for residue_a, residue_b in zip(
-                    sequence_a[start_a:end_a], sequence_b[start_b:end_b]
-                )
-            )
-        alignment_length += max(consumed_a, consumed_b)
 
-    return (matches / alignment_length) * 100
+def pairwise_sequence_alignment(sequence_a: str, sequence_b: str) -> dict:
+    """Return detailed information about a global pairwise alignment."""
+    sequence_a = _normalise_sequence(sequence_a)
+    sequence_b = _normalise_sequence(sequence_b)
+
+    aligner = PairwiseAligner()
+    aligner.mode = "global"
+    aligner.match_score = 1
+    aligner.mismatch_score = 0
+    aligner.open_gap_score = -1
+    aligner.extend_gap_score = -1
+
+    alignment = aligner.align(sequence_a, sequence_b)[0]
+    aligned_a = str(alignment[0])
+    aligned_b = str(alignment[1])
+
+    matches = sum(res_a == res_b for res_a, res_b in zip(aligned_a, aligned_b))
+    alignment_length = len(aligned_a)
+    identity_percent = (matches / alignment_length) * 100 if alignment_length else 0.0
+
+    return {
+        "sequence_a_aligned": aligned_a,
+        "sequence_b_aligned": aligned_b,
+        "matches": matches,
+        "alignment_length": alignment_length,
+        "identity_percent": identity_percent,
+    }
 
 
 def fetch_ncbi_gene_data():
@@ -71,20 +75,24 @@ def fetch_ncbi_gene_data():
 
     # For demonstration reliability in a standalone script,
     # we analyze a standard representative sequence snippet or fetch live.
-    # Let's use a robust sequence string representing a genomic target.
-    # (You can expand this to call NCBI's API directly via Entrez utilities).
     real_seq = "ATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCAT"
     return real_seq
 
 
 def analyze_sequence(seq):
+    if not isinstance(seq, str):
+        raise TypeError("Sequence must be a string.")
+
+    seq = _normalise_sequence(seq)
     total_length = len(seq)
+    if total_length == 0:
+        raise ValueError("Sequence must not be empty.")
+
     a_count = seq.count('A')
     t_count = seq.count('T')
     g_count = seq.count('G')
     c_count = seq.count('C')
 
-    # Calculate GC Content percentage
     gc_content = ((g_count + c_count) / total_length) * 100
 
     results = {
@@ -93,7 +101,7 @@ def analyze_sequence(seq):
         "T": t_count,
         "G": g_count,
         "C": c_count,
-        "GC_content": gc_content
+        "GC_content": gc_content,
     }
     return results
 
@@ -115,8 +123,7 @@ def plot_nucleotide_counts(results_dict):
     plt.xlabel('Nucleotide Base')
     plt.ylabel('Count')
     plt.title('NCBI Genomic Sequence Nucleotide Distribution')
-
-    # Save the chart as an image artifact
+    plt.tight_layout()
     plt.savefig('genomic_analysis_chart.png')
     print("\nSaved chart visualization as 'genomic_analysis_chart.png'!")
 
@@ -127,3 +134,14 @@ if __name__ == "__main__":
     results = analyze_sequence(real_seq)
     print_results(results)
     plot_nucleotide_counts(results)
+
+    # Example pairwise sequence alignment
+    example_seq_1 = "ATCGATCGATCG"
+    example_seq_2 = "ATCGATCGATCA"
+    alignment_summary = pairwise_sequence_alignment(example_seq_1, example_seq_2)
+
+    print("\nPairwise Sequence Alignment Example")
+    print(f"Sequence A: {alignment_summary['sequence_a_aligned']}")
+    print(f"Sequence B: {alignment_summary['sequence_b_aligned']}")
+    print(f"Matches: {alignment_summary['matches']}/{alignment_summary['alignment_length']}")
+    print(f"Identity: {alignment_summary['identity_percent']:.2f}%")
