@@ -1,147 +1,165 @@
+import argparse
+import csv
+from pathlib import Path
+from typing import Dict, Mapping, Sequence
+
 import matplotlib.pyplot as plt
+from Bio import Phylo, SeqIO
 from Bio.Align import PairwiseAligner
+from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceMatrix, DistanceTreeConstructor
 
 
 def _normalise_sequence(sequence: str) -> str:
-    """Return a clean uppercase sequence with whitespace removed."""
+    """Return an uppercase sequence with whitespace removed."""
     if not isinstance(sequence, str):
         raise TypeError("Sequences must be strings.")
-
     normalised = "".join(sequence.split()).upper()
     if not normalised:
         raise ValueError("Sequences must not be empty.")
     return normalised
 
 
-def pairwise_sequence_identity(sequence_a: str, sequence_b: str) -> float:
-    """Return the percentage identity between two sequences using a global alignment."""
-    sequence_a = _normalise_sequence(sequence_a)
-    sequence_b = _normalise_sequence(sequence_b)
-
+def _make_aligner() -> PairwiseAligner:
     aligner = PairwiseAligner()
     aligner.mode = "global"
     aligner.match_score = 1
     aligner.mismatch_score = 0
     aligner.open_gap_score = -1
     aligner.extend_gap_score = -1
-
-    alignment = aligner.align(sequence_a, sequence_b)[0]
-    aligned_a = str(alignment[0])
-    aligned_b = str(alignment[1])
-
-    if len(aligned_a) == 0:
-        return 0.0
-
-    matches = sum(res_a == res_b for res_a, res_b in zip(aligned_a, aligned_b))
-    identity_percent = (matches / len(aligned_a)) * 100
-    return identity_percent
+    return aligner
 
 
 def pairwise_sequence_alignment(sequence_a: str, sequence_b: str) -> dict:
-    """Return detailed information about a global pairwise alignment."""
+    """Return the best global alignment and its percentage identity."""
     sequence_a = _normalise_sequence(sequence_a)
     sequence_b = _normalise_sequence(sequence_b)
-
-    aligner = PairwiseAligner()
-    aligner.mode = "global"
-    aligner.match_score = 1
-    aligner.mismatch_score = 0
-    aligner.open_gap_score = -1
-    aligner.extend_gap_score = -1
-
-    alignment = aligner.align(sequence_a, sequence_b)[0]
-    aligned_a = str(alignment[0])
-    aligned_b = str(alignment[1])
-
-    matches = sum(res_a == res_b for res_a, res_b in zip(aligned_a, aligned_b))
+    alignment = _make_aligner().align(sequence_a, sequence_b)[0]
+    aligned_a, aligned_b = str(alignment[0]), str(alignment[1])
     alignment_length = len(aligned_a)
-    identity_percent = (matches / alignment_length) * 100 if alignment_length else 0.0
-
+    matches = sum(a == b for a, b in zip(aligned_a, aligned_b))
     return {
         "sequence_a_aligned": aligned_a,
         "sequence_b_aligned": aligned_b,
         "matches": matches,
         "alignment_length": alignment_length,
-        "identity_percent": identity_percent,
+        "identity_percent": (matches / alignment_length * 100) if alignment_length else 0.0,
+        "score": float(alignment.score),
     }
 
 
-def fetch_ncbi_gene_data():
-    """
-    Fetches genomic data from the NCBI Entrez API.
-    Using a sample sequence or retrieving live sequence data.
-    """
-    print("--- Live NCBI Genomic Data Analysis ---")
-
-    # For demonstration reliability in a standalone script,
-    # we analyze a standard representative sequence snippet or fetch live.
-    real_seq = "ATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCAT"
-    return real_seq
+def pairwise_sequence_identity(sequence_a: str, sequence_b: str) -> float:
+    """Return global alignment identity as a percentage."""
+    return pairwise_sequence_alignment(sequence_a, sequence_b)["identity_percent"]
 
 
-def analyze_sequence(seq):
-    if not isinstance(seq, str):
-        raise TypeError("Sequence must be a string.")
+def calculate_identity_matrix(sequences: Mapping[str, str]) -> Dict[str, Dict[str, float]]:
+    """Compare every sequence to every other sequence with PairwiseAligner."""
+    if len(sequences) < 2:
+        raise ValueError("At least two sequences are required to build an identity matrix.")
+    names = list(sequences)
+    cleaned = {name: _normalise_sequence(seq) for name, seq in sequences.items()}
+    matrix = {row: {} for row in names}
+    for i, name_a in enumerate(names):
+        for j in range(i, len(names)):
+            name_b = names[j]
+            identity = 100.0 if i == j else pairwise_sequence_identity(cleaned[name_a], cleaned[name_b])
+            matrix[name_a][name_b] = identity
+            matrix[name_b][name_a] = identity
+    return matrix
 
+
+def load_fasta_sequences(fasta_path: str | Path) -> Dict[str, str]:
+    """Load named nucleotide sequences from a FASTA file."""
+    records = list(SeqIO.parse(str(fasta_path), "fasta"))
+    if not records:
+        raise ValueError(f"No FASTA records found in {fasta_path}.")
+    sequences = {record.id: _normalise_sequence(str(record.seq)) for record in records}
+    if len(sequences) != len(records):
+        raise ValueError("FASTA record identifiers must be unique.")
+    return sequences
+
+
+def write_identity_matrix(matrix: Mapping[str, Mapping[str, float]], output_path: str | Path) -> None:
+    names = list(matrix)
+    with open(output_path, "w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["sequence"] + names)
+        for name in names:
+            writer.writerow([name] + [f"{matrix[name][other]:.6f}" for other in names])
+
+
+def build_neighbor_joining_tree(matrix: Mapping[str, Mapping[str, float]]):
+    """Build a Neighbor-Joining tree from percentage identities."""
+    names = list(matrix)
+    distances = [[0.0 if i == j else (100.0 - matrix[names[i]][names[j]]) / 100.0
+                  for j in range(i + 1)] for i in range(len(names))]
+    distance_matrix = DistanceMatrix(names, distances)
+    return DistanceTreeConstructor().nj(distance_matrix)
+
+
+def write_neighbor_joining_tree(matrix: Mapping[str, Mapping[str, float]], output_path: str | Path) -> None:
+    tree = build_neighbor_joining_tree(matrix)
+    Phylo.write(tree, str(output_path), "newick")
+
+
+def analyze_sequence(seq: str) -> dict:
     seq = _normalise_sequence(seq)
-    total_length = len(seq)
-    if total_length == 0:
-        raise ValueError("Sequence must not be empty.")
-
-    a_count = seq.count('A')
-    t_count = seq.count('T')
-    g_count = seq.count('G')
-    c_count = seq.count('C')
-
-    gc_content = ((g_count + c_count) / total_length) * 100
-
-    results = {
-        "length": total_length,
-        "A": a_count,
-        "T": t_count,
-        "G": g_count,
-        "C": c_count,
-        "GC_content": gc_content,
+    counts = {base: seq.count(base) for base in "ATGC"}
+    return {
+        "length": len(seq),
+        "A": counts["A"], "T": counts["T"], "G": counts["G"], "C": counts["C"],
+        "GC_content": (counts["G"] + counts["C"]) / len(seq) * 100,
     }
-    return results
 
 
-def print_results(results):
-    print(f"Total Length: {results['length']}")
-    print(f"Adenine (A): {results['A']}")
-    print(f"Thymine (T): {results['T']}")
-    print(f"Guanine (G): {results['G']}")
-    print(f"Cytosine (C): {results['C']}")
-    print(f"GC Content (%): {results['GC_content']:.1f}")
+def analyze_fasta(fasta_path: str | Path, output_dir: str | Path = "results") -> dict:
+    """Run metrics, all-vs-all alignment, and NJ tree generation for a FASTA file."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    sequences = load_fasta_sequences(fasta_path)
+    if len(sequences) < 2:
+        raise ValueError("The FASTA file must contain at least two sequences.")
+
+    matrix = calculate_identity_matrix(sequences)
+    write_identity_matrix(matrix, output_dir / "sequence_identity_matrix.csv")
+    write_neighbor_joining_tree(matrix, output_dir / "neighbor_joining_tree.nwk")
+
+    with open(output_dir / "sequence_metrics.csv", "w", newline="") as handle:
+        fieldnames = ["organism", "length", "gc_percentage"]
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for name, sequence in sequences.items():
+            metrics = analyze_sequence(sequence)
+            writer.writerow({"organism": name, "length": metrics["length"],
+                             "gc_percentage": f"{metrics['GC_content']:.6f}"})
+    return matrix
 
 
-def plot_nucleotide_counts(results_dict):
-    bases = ['Adenine (A)', 'Thymine (T)', 'Guanine (G)', 'Cytosine (C)']
-    counts = [results_dict['A'], results_dict['T'], results_dict['G'], results_dict['C']]
-    plt.figure(figsize=(8, 5))
-    plt.bar(bases, counts, color=['#ff9999', '#66b3ff', '#99ff99', '#ffcc99'])
-    plt.xlabel('Nucleotide Base')
-    plt.ylabel('Count')
-    plt.title('NCBI Genomic Sequence Nucleotide Distribution')
-    plt.tight_layout()
-    plt.savefig('genomic_analysis_chart.png')
-    print("\nSaved chart visualization as 'genomic_analysis_chart.png'!")
+def fetch_ncbi_gene_data() -> str:
+    """Return the legacy demonstration sequence used by the original pipeline."""
+    return "ATCGATCGATCGATCGATCGGCGCGCATATCGATCGATCGATCGATCGGCGCGCAT"
 
 
-# Execute pipeline
+def plot_nucleotide_counts(results_dict: dict, output_path: str | Path = "genomic_analysis_chart.png") -> None:
+    bases = ["Adenine (A)", "Thymine (T)", "Guanine (G)", "Cytosine (C)"]
+    counts = [results_dict["A"], results_dict["T"], results_dict["G"], results_dict["C"]]
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.bar(bases, counts, color=["#ff9999", "#66b3ff", "#99ff99", "#ffcc99"])
+    ax.set(xlabel="Nucleotide Base", ylabel="Count", title="Nucleotide Distribution")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300)
+    plt.close(fig)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Compare bacterial 16S rRNA sequences.")
+    parser.add_argument("--fasta", required=True, help="Input FASTA containing 16S rRNA sequences")
+    parser.add_argument("--output-dir", default="results", help="Directory for CSV, Newick, and plots")
+    args = parser.parse_args()
+    matrix = analyze_fasta(args.fasta, args.output_dir)
+    print(f"Compared {len(matrix)} sequences.")
+    print(f"Wrote identity matrix and Neighbor-Joining tree to {args.output_dir}/")
+
+
 if __name__ == "__main__":
-    real_seq = fetch_ncbi_gene_data()
-    results = analyze_sequence(real_seq)
-    print_results(results)
-    plot_nucleotide_counts(results)
-
-    # Example pairwise sequence alignment
-    example_seq_1 = "ATCGATCGATCG"
-    example_seq_2 = "ATCGATCGATCA"
-    alignment_summary = pairwise_sequence_alignment(example_seq_1, example_seq_2)
-
-    print("\nPairwise Sequence Alignment Example")
-    print(f"Sequence A: {alignment_summary['sequence_a_aligned']}")
-    print(f"Sequence B: {alignment_summary['sequence_b_aligned']}")
-    print(f"Matches: {alignment_summary['matches']}/{alignment_summary['alignment_length']}")
-    print(f"Identity: {alignment_summary['identity_percent']:.2f}%")
+    main()

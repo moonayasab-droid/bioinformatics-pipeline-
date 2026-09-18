@@ -1,34 +1,59 @@
-import pandas as pd # pyright: ignore[reportMissingModuleSource]
+import argparse
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import os
+import pandas as pd
 
-# Ensure results directory exists
-os.makedirs("results", exist_ok=True)
 
-# Load the metrics CSV
-df = pd.read_csv("results/sequence_metrics.csv")
+def plot_gc_content(metrics_path: str | Path, output_path: str | Path) -> None:
+    df = pd.read_csv(metrics_path)
+    required = {"organism", "gc_percentage"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing columns in metrics file: {', '.join(sorted(missing))}")
+    fig, ax = plt.subplots(figsize=(11, 6))
+    bars = ax.bar(df["organism"], df["gc_percentage"], color="#4C72B0")
+    ax.set(xlabel="Bacterial sequence", ylabel="GC content (%)", ylim=(0, 100),
+           title="GC Content of 16S rRNA Sequences")
+    ax.tick_params(axis="x", rotation=35)
+    for bar in bars:
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
+                f"{bar.get_height():.1f}%", ha="center", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300)
+    plt.close(fig)
 
-print("Loaded Data for Comparison:")
-print(df[['organism', 'length', 'gc_percentage']])
 
-# Create comparative GC percentage chart
-plt.figure(figsize=(10, 6))
-bars = plt.bar(df['organism'], df['gc_percentage'], color=['#4C72B0', '#55A868', '#C44E52', '#8172B3', '#CCB974'])
+def plot_identity_heatmap(matrix_path: str | Path, output_path: str | Path) -> None:
+    matrix = pd.read_csv(matrix_path, index_col=0)
+    matrix = matrix.apply(pd.to_numeric)
+    if matrix.empty or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Identity matrix must be a non-empty square matrix.")
+    fig_size = max(7, min(16, 4 + len(matrix) * 0.65))
+    fig, ax = plt.subplots(figsize=(fig_size, fig_size))
+    image = ax.imshow(matrix.values, cmap="viridis", vmin=0, vmax=100)
+    ax.set_xticks(range(len(matrix.columns)), matrix.columns, rotation=45, ha="right")
+    ax.set_yticks(range(len(matrix.index)), matrix.index)
+    ax.set_title("Pairwise 16S rRNA Sequence Identity (%)")
+    fig.colorbar(image, ax=ax, label="Identity (%)", shrink=0.8)
+    if len(matrix) <= 20:
+        for row in range(len(matrix.index)):
+            for col in range(len(matrix.columns)):
+                ax.text(col, row, f"{matrix.iloc[row, col]:.1f}", ha="center", va="center", color="white", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300)
+    plt.close(fig)
 
-plt.xlabel('Bacterial Species', fontsize=12)
-plt.ylabel('GC Content (%)', fontsize=12)
-plt.title('Comparative GC Content of 16S rRNA Genes Across Bacterial Species', fontsize=14, fontweight='bold')
-plt.xticks(rotation=15, ha='right')
-plt.ylim(0, 100)
 
-# Add value labels on top of bars
-for bar in bars:
-    height = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2., height + 1, f'{height}%', ha='center', va='bottom', fontsize=10)
+def plot_all(results_dir: str | Path = "results") -> None:
+    results_dir = Path(results_dir)
+    plot_gc_content(results_dir / "sequence_metrics.csv", results_dir / "gc_comparison.png")
+    plot_identity_heatmap(results_dir / "sequence_identity_matrix.csv", results_dir / "identity_heatmap.png")
+    print(f"Saved visualizations to {results_dir}/")
 
-plt.tight_layout()
 
-# Save chart
-chart_path = "results/gc_comparison.png"
-plt.savefig(chart_path)
-print(f"\nSuccessfully generated and saved comparison chart to {chart_path}!") 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Plot pipeline results.")
+    parser.add_argument("--results-dir", default="results")
+    args = parser.parse_args()
+    plot_all(args.results_dir)
