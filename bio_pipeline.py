@@ -89,13 +89,25 @@ def write_identity_matrix(matrix: Mapping[str, Mapping[str, float]], output_path
 
 
 def build_neighbor_joining_tree(matrix: Mapping[str, Mapping[str, float]]):
-    """Build a Neighbor-Joining tree from percentage identities."""
+    """Build a Neighbor-Joining tree from percentage identities.
+
+    Biopython's DistanceMatrix constructor requires a lower-triangular list:
+    row 0 contains one value, row 1 contains two values, and so on.  Passing
+    a full square matrix raises ``ValueError: 'matrix' should be in lower
+    triangle format``.
+    """
     names = list(matrix)
-    distance_matrix = [
-        [0.0 if i == j else 1.0 - (matrix[names[i]][names[j]] / 100.0) for j in range(len(names))]
-        for i in range(len(names))
-    ]
-    return DistanceTreeConstructor().nj(DistanceMatrix(names, distance_matrix))
+    lower_triangle = []
+    for row_index, row_name in enumerate(names):
+        row = []
+        for column_index in range(row_index + 1):
+            column_name = names[column_index]
+            identity = matrix[row_name][column_name]
+            row.append(0.0 if row_index == column_index else 1.0 - (identity / 100.0))
+        lower_triangle.append(row)
+
+    distance_matrix = DistanceMatrix(names, lower_triangle)
+    return DistanceTreeConstructor().nj(distance_matrix)
 
 
 def write_neighbor_joining_tree(matrix: Mapping[str, Mapping[str, float]], output_path: str | Path) -> None:
