@@ -1,0 +1,19 @@
+accession,organism,genus,family,group_type,notes
+NR_044820.1,Escherichia coli,Escherichia,Enterobacteriaceae,Control (Standard),Reference strain K-12
+NR_102839.1,Salmonella enterica,Salmonella,Enterobacteriaceae,Target Genus,Type strain
+NR_041316.1,Klebsiella pneumoniae,Klebsiella,Enterobacteriaceae,Target Genus,Clinical reference
+NR_028945.1,Enterobacter cloacae,Enterobacter,Enterobacteriaceae,Target Genus,Standard strain
+NR_026135.1,Serratia marcescens,Serratia,Yersiniaceae,Target Genus,Environmental/Clinical
+NR_028990.1,Shigella flexneri,Shigella,Enterobacteriaceae,Target Genus,Pathogenic reference
+NR_118995.1,Bacillus subtilis,Bacillus,Bacillaceae,Gram-Positive Outgroup,Model Gram-positive
+NR_041336.1,Bacillus anthracis,Bacillus,Bacillaceae,Gram-Positive Outgroup,Pathogenic strain
+NR_036893.1,Staphylococcus aureus,Staphylococcus,Staphylococcaceae,Gram-Positive Outgroup,Clinical reference
+NR_118534.1,Staphylococcus epidermidis,Staphylococcus,Staphylococcaceae,Gram-Positive Outgroup,Skin flora reference
+NR_042798.1,Pseudomonas aeruginosa,Pseudomonas,Pseudomonadaceae,Proteobacteria Outgroup,Clinical model
+NR_025250.1,Streptomyces coelicolor,Streptomyces,Streptomycetaceae,High-GC Outgroup,Actinomycete benchmark
+, accession,organism,genus,family,gram_status
+J01859.1,Escherichia coli,Escherichia,Enterobacteriaceae,Negative
+AB021193.1,Bacillus subtilis,Bacillus,Bacillaceae,Positive
+X06684.1,Pseudomonas aeruginosa,Pseudomonas,Pseudomonadaceae,Negative
+L37600.1,Staphylococcus aureus,Staphylococcus,Staphylococcaceae,Positive
+AJ391829.1,Streptomyces coelicolor,Streptomyces,Streptomycetaceae,Positive 
