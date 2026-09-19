@@ -1,4 +1,4 @@
-16S rRNA Reliability and Methodological Sensitivity Analysis
+***16S rRNA Reliability and Methodological Sensitivity Analysis***
 Overview & Research Question
 This repository houses an independent computational research study investigating a central question in molecular microbial ecology: How reliably does 16S rRNA sequence similarity recover bacterial taxonomy, and how sensitive are those conclusions to methodological choices?
 Rather than treating bioinformatics pipelines as black boxes, this project establishes a rigorous baseline using curated sequence data to evaluate clustering accuracy, distance thresholds, and the impact of quality control parameters on downstream phylogenetic reconstruction.
